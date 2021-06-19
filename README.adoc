@@ -1,0 +1,307 @@
+:toc:
+:toclevels: 3
+// :sectlinks: true
+:sectnumlevels: 2
+:sectnums:
+
+= Massive MapTool Server (MMS)
+
+:source-highlighter: rouge
+
+This project is an attempt to create a _MapTool_ installation in which the
+server password is not sufficient to connect to said server.
+
+This is accomplished by configuring an SSH server on the same system where
+the _MapTool_ server is running and using SSH's built in port forwarding
+capability to forward connections to the _MapTool_ server.
+
+This moves the decision of who is allowed to connect to the SSH
+configuration and not just the _MapTool_ server's "player password".
+
+A preconfigured virtual machine is available at https://www.eeconsulting.net/mms/Massive%20MapTool%20Server.ova.
+If you want to use your own hosting platform, you'll need to setup your own
+virtual machine.
+Notes on what I had to do to configure Ubuntu 18.04 are under <<Setting Up a Virtual Machine from Scratch>>
+
+== Connection Set Up
+
+There are four steps.  The number in <<Figure 1>> refers to these step numbers.
+
+. Start the _MapTool_ server
+. Start the _SSH_ server (most systems do this automatically at boot)
+. Start the _SSH_ client and enable connection tunneling
+. Start the _MapTool_ client and connect to the tunnel
+
+.Figure 1
+[ditaa]
+....
+
+┌─────────────────────────────┐             ┌──────────────────────────────┐
+│                             │             │                              │
+│   ┌─────────────────────┐   │             │   ┌──────────────────────┐   │
+│   │                     │   │             │   │                      │   │
+│   │  4. MapTool client  │   │             │   │  1. MapTool server   │   │
+│   │                     │   │             │   │                      │   │
+│   └──────────┬──────────┘   │             │   └──────────▲───────────┘   │
+│              │              │             │              │               │
+│              │              │             │              │               │
+│              │ 4.           │             │              │ 4.            │
+│              │              │             │              │               │
+│              │              │             │              │               │
+│   ┌──────────▼──────────┐   │      4.     │   ┌──────────┴───────────┐   │
+│   │                     ├───┼─────────────┼───►                      │   │
+│   │     3. SSH client   │   │      3.     │   │     2. SSH server    │   │
+│   │                     ◄───┼─────────────┼───►                      │   │
+│   └─────────────────────┘   │             │   └──────────────────────┘   │
+│                             │             │                              │
+└─────────────────────────────┘             └──────────────────────────────┘
+
+....
+
+=== Step 1: Start the _MapTool_ Server
+
+As shown in the diagram, the first step is to start the _MapTool_ server.
+Use whatever port you wish (here I'm going to use _srvrPort_ as a placeholder).
+Do NOT specify a value for the _RPTools Registry_ field.
+(The server is not going to be accessible to the public, so adding a name to the registry is nonsensical.)
+
+It would be ideal if _MapTool_ could be forced to bind to only localhost, but that isn't currently possible.
+A workaround is to use a _srvrPort_ that cannot be connected to from outside the server.
+This can frequently be done by using firewall rules to block such connection attempts, or to configure the virtual machine's network card in NAT mode.
+// suppress inspection "GrazieInspection"
+(See the section below, <<Running the VM Locally>>.)
+
+=== Step 2: Start the _SSH_ Server
+
+Once the _MapTool_ server is running, start the _SSH_ server daemon on the same system.
+This will be performed as part of the bootup sequence of most systems and starting this daemon prior to _MapTool_ is fine and will still work properly.
+
+This _SSH_ server will accept connection requests from players and allow them to forward a local port on their end to the _MapTool_ server port on the server.
+Note that _SSH_ cannot forward UDP traffic, but _MapTool_ doesn't need UDP anyway.
+
+=== Step 3: Start _SSH_ on the Player System
+
+The player starts their _SSH_ client and tells it to forward a local port to the remote _MapTool_ port.
+I'm going to use _clntPort_ to represent the local port, and _srvrIP_ to represent the server's IP address and/or hostname (either one will work, as hostnames are converted to IP addresses on the fly).
+
+==== Unix Clients
+
+A typical Un*x command line on the client would look something like this:
+
+// `ssh` _srvrIP_ `-t` `-L` ``localhost:``__clntPort__``:localhost:``__srvrPort__
+    ssh -t -L localhost:clntPort:localhost:srvrPort maptool@srvrIP
+
+In the above command line, `-t` enables creation of a pseudotty for the connection.
+The server will require pseudottys in order to implement logging, but some _SSH_ clients may not create them by default, thus this option is included.
+
+The `-L` option is how one specifies the local port and where it should be forwarded.
+The string ``localhost:``__clntPort__ says that the _SSH_ client should listen on the given port on the local machine.
+When a connection is made to that port, the request is forwarded across the encrypted link to the server.
+The _SSH_ daemon on the server will then connect to ``localhost:``__srvrPort__ and transparently tunnel all traffic between the two end points.
+
+The last field specifies who to login as and what the server IP address is.
+
+Note that remote GMs can also connect using the above process.
+
+==== Windows Clients
+
+Using something like _PuTTY_:
+
+. Start _PuTTY_ and go into **Settings**.
+
+. Under **Session**, enter the IP address of the server into the **Host name** field.
+
+. Under **Connection -> Data**, put `maptool` in the username field.
+
+. Under **Connection -> SSH**, turn on the **Don't start a shell** checkbox.
+
+=== Step 4: Start _MapTool_ on the Player System
+
+The last step is to start _MapTool_ on the player's system:
+
+. The player should open _MapTool_ and choose *File -> Connect to Server...*.
+. Fill in player name and player password as provided by the GM.
+. The port number should be filled in as _clntPort_.
+This is *not* the port number that the _MapTool_ server is listening to!
+Instead, it's the local port that _SSH_ is going to tunnel over its connection.
+. Switch to the *Direct* tab and fill in `localhost` as the server name.
+. Click *OK* to connect.
+
+_MapTool_ will connect to ``localhost:``__clntPort__ which will then be forwarded to the remote system which will connect to the _MapTool_ server.
+
+Note that _clntPort_ and _srvrPort_ don't have to be the same numbers.
+It might seem appropriate to make them the same, but I would discourage that.
+If an error occurs in the network connection, using different port numbers will make explicit where the problem occurred (local or remote) when the error is reported.
+
+== Adding Clients to the Allowed Connection List
+
+You will want to perform this section once for each player and/or GM that
+needs to connect.
+
+To add a player or GM to the allowed list:
+
+. Have the individual generate a public/private key pair.
+
+The public key **must** be a single line of text, and it should contain three
+fields:  the type of encryption, the key itself, and a comment field.
+There are many utilities that can generate such a key, but the _PuTTY Key
+Generator_ works well on _Windows_.
+img::[putty_key_generator.png]
+
+Unix systems should use `ssh-keygen` (specify the output filename to be an
+unused filename so you don't overwrite an existing key pair!).
+
+. They should send you the public key (email, text msg, Discord DM, whatever).
+**The private key must remain private!**
+If anyone else were to get their hands on the private key, they would be able
+to impersonate this player.
+If they think their key has been compromised, they should notify you asap so
+you can delete the corresponding public key.
+
+. You should store the key in a file under `~/.ssh/player-keys`.
+Pick a filename that lets you know which individual it came from.
+You can use any characters that are valid in a filename on _Linux_, so even a
+full email address could be used as the filename.
+**Very important:**  the filename must end with `.pub` or it won't be
+recognized.
+
+. Execute the `~/.ssh/activate.sh` script.
+That script will gather all of the player keys together into one file, with a
+prefix on every line that is needed for the tunneling to work.
+The name of each file will also be embedded on that line so the SSH server can
+create a log of who logged in/out (which is why you want to pick a filename
+that you can easily relate back to the player).
+
+The new player/GM is now ready to go.
+They should perform the two client-based steps in the previous section,
+connecting via _SSH_ (step 3) and then running the _MapTool_ client (step 4).
+
+== Setting Up a Virtual Machine from Scratch
+
+I have provided an Ubuntu 18.04 system with _MapTool_ 1.8.5 installed and _SSH_ already configured.
+
+However, you may want to set up and use your own virtual machine.
+These are the steps required to get Ubuntu up and running; your distribution may require some modification of these steps -- or even additional ones -- so use these as guide, but feel free to tweak them.
+
+Prerequisites:
+
+* Ubuntu (tested with 18.04, and the "minimal" installation)
+* _MapTool_ (tested with 1.8.5)
+* openssh-server
+* pandoc (only to convert this AsciiDoc file into HTML or another format)
+
+The username is *maptool*, and the password is *maptool* (yeah, _real_ secure, huh?).
+You'll also see a username `franke` which is a testing account for me; that will go away and be replaced with something like `admin` in a future version.
+
+Several locations under `~/.ssh` are used for various public key management functions.
+A quick overview is given here.
+
+. `player-keys/` - This subdirectory contains the public keys for all players.
+The name of the file with `.pub` removed is the "username" that will show up in the MMS login file (currently not enabled).
+These files are copied from the output created by `ssh-keygen`.
+It is expected that the players will generate their own keys and send the public one to the VM administrator for inclusion in this directory.
+(I'm unsure of the process on Windows to generate such keys since I don't use Windows, but I'm sure the _PuTTY_ suite of software tools can do it because my brother has done it for a project we collaborated on.)
+Filenames must be unique, so the VM administrator should ensure that when storing the files.
+
+. `setup.sh` - This script sets up some environment variables and changes to the `~/.ssh` directory.
+It is for internal use only.
+
+. `activate.sh` - This script collects all public keys under `player-keys` and creates the `authorized_keys` file used by the SSH server.
+
+. `mt-serve` - This is the script automatically executed when a player connects as `maptool` to the _MapTool_ server.
+It uses the `REMOTE` environment variable created in the `authorized_keys` file to identify the player name for logging purposes (not related to the name used in _MapTool_ for the player).
+It requires that ptys be enabled; from the command line that means adding the `-t` as documented above, but we'll need to figure out the option for this on Windows.
+
+Other scripts are part of a work-in-progress to create a menu system that helps automate management of the public keys.
+
+=== SSH Server Configuration
+
+[source,bash,linenum]
+....
+LoginGraceTime 30
+UsePAM yes
+PermitUserEnvironment yes
+
+Match User maptool
+	# This is the player name assigned by the GM
+	AcceptEnv REMOTE
+	AllowAgentForwarding no
+	AllowStreamLocalForwarding no
+	AllowTcpForwarding yes
+	AuthenticationMethods publickey
+	ClientAliveCountMax 3
+	ClientAliveInterval 60
+	ForceCommand ~/.ssh/mt-serve
+	KbdInteractiveAuthentication no
+	# 100 simultaneous login sessions
+	MaxSessions 100
+	PasswordAuthentication no
+	# Only allow remote ports to be forwarded to local ports on this host
+	PermitOpen localhost:*
+	PermitTTY yes
+	PermitUserRC no
+	# Already turned on, but just in case it's turned off in the main file
+	PubkeyAuthentication yes
+	X11Forwarding no
+....
+
+The above will let you use password authentication for accounts other than *maptool*.
+If you want everything to be done through public keys, add this line above the `Match` block:
+
+[source,bash,linenum]
+....
+PasswordAuthentication no
+....
+
+=== Network Settings for the Virtual Machine
+
+All that's left is to configure the network for the VM.
+This section potentially has a lot of options, depending on how you want to run things.
+I will describe what I think are the two most common setups:
+
+. Running the VM with a network card set to *NAT*.
+. Running the VM with a network card set to *Bridged*.
+
+==== Running the VM Locally
+
+For this, you only need a single network card configured inside the VM.
+That network card has two options that are probably the most useful:
+
+. *Bridged* - (Recommended) This option puts the guest VM onto your local LAN, just as though it were another physical machine connected to the same router.
+It will contact your router and be assigned a dynamic IP address automatically (assuming your router is running a DHCP service, which it likely is):
+.. Open the *Settings* for the VM.
+.. Click on the *Network* tab.
+.. Configure the first network card to be `Bridged`.
+.. No other _VirtualBox_ configuration is necessary.
+
+. *NAT* - This prevents all inbound connection requests by default, but you can configure port forwarding to the VM via the _VirtualBox_ configuration panel:
+.. Open the *Settings* for the VM.
+.. Click on the *Network* tab.
+.. Configure the first network card to be `NAT`.
+.. Click to expand the *Advanced* section.
+.. Click the *Port Forwarding...* button.
+.. Add a new port forwarding rule that directs some local port on your host system to a particular port inside the guest VM.
+For example, host port `12345` might be directed to `51234` inside the guest.
+Now, any attempt to talk to `12345` on your system will automatically be routed into the guest VM, including connection attempts from outside the host operating system.
+You can test this by start the MapTool server inside the guest, then starting a client on your desktop.
+Choose *File -> Connect to Server...* and use the *Direct* tab to fill in `localhost` and port number `12345`.
+Your connection should work.
+
+There are options other than the two above.
+For example, I frequently use two network cards in my VMs, one which is configured for NAT that is used for communicating to the outside world, and a second one set to Host-only so that I can easily connect from the host OS to the guest without needing port forwarding.
+These advanced network configurations are not covered here.
+
+=== Download and Install MapTool Inside the VM
+
+From inside the VM, visit https://github.com/RPTools/maptool/releases and download the release you wish to use.
+Install the application.
+Current builds put the installation under `/opt/maptool` and the executable is in `/opt/maptool/bin/MapTool`.
+
+It may be convenient to start MapTool directly from a desktop icon.
+To do that, copy the file that comes with MapTool into your local desktop icons list:
+
+    cp /opt/maptool/lib/*.desktop ~/.local/share/applications
+
+This also integrates it into Ubuntu's desktop search function.
+(Other distributions likely have a different destination for the copy.)
+This means you can click the *Show Applications* button and type `map` to see the MapTool icon and execute it.

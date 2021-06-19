@@ -1,0 +1,19 @@
+#!/bin/bash
+
+if [[ "$MENUPATH" == "" ]]; then
+    echo >&2 "Error: '$0' should only be sourced by the menu system."
+    exit 99
+fi
+
+Menu=(
+"Add a new player (create or import a public key)"
+"Remove a player"
+"Exit"
+)
+
+Cmds=(
+"empty"
+"add_player.sh"
+"remove_player.sh"
+"exit 0"
+)
