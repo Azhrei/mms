@@ -1,0 +1,26 @@
+:toc:
+// :sectlinks: true
+:sectnumlevels: 2
+:sectnums:
+
+= Container Creation
+
+:source-highlighter: rouge
+
+This document describes the components needed to create a standard virtual
+machine or container for the _Massive MapTool Server_ project.
+
+== Required Components
+
+The resulting image (either a virtual machine or container) will require:
+
+. The desired version of _MapTool_ (current is 1.9.2)
+. The SSH daemon (tested with `openssh-server v7.6p1`)
+
+Optional components include:
+
+. AsciiDoc (`pandoc 1.19.2.4`; for converting this document into HTML)
+
+== Docker Configuration File
+
+Use the following file as the `Dockerfile` for creating the image.
