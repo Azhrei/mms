@@ -24,3 +24,20 @@ Optional components include:
 == Docker Configuration File
 
 Use the following file as the `Dockerfile` for creating the image.
+
+[source,dockerfile]
+....
+FROM ubuntu:latest
+RUN useradd -m maptool -G sudo
+RUN mkdir ~maptool/.ssh
+RUN chmod 700 ~maptool/.ssh
+COPY . ~/maptool/.ssh
+
+# We might need to install openssh-server and/or pandoc...
+#RUN apt install openssh-server
+#RUN apt install pandoc
+....
+
+// Look into using a remote context.  Essentially, create a repo with
+// everything needed, including a Dockerfile, and tell `docker build` to use
+// that repo.  It'll `git clone` the repo and pass it as the build context.
