@@ -6,10 +6,12 @@ RUN apt update && apt install -y openssh-server curl sudo
 # See https://askubuntu.com/a/1110843/531533
 RUN mkdir -p -m0755 /var/run/sshd
 
-# This one is (eventually) needed for the `ubuntu-desktop` package
+# The `tzdata` pkg is (eventually) needed for the `ubuntu-desktop` package.
+# Note that its installation is interactive, hence piping data into it.
 RUN apt update && echo -e "\n12\n5" | apt install -y tzdata
 RUN groupadd maptool && useradd -m maptool -g maptool -G adm,cdrom
 
+# Need to install a full GUI if we want to run MapTool inside the container.
 RUN apt update && apt install -y ubuntu-desktop xdg-utils
 
 # Creates directory, if needed.
@@ -41,12 +43,12 @@ RUN chown -R maptool:maptool /home/maptool && \
 #USER maptool
 
 # This is documentary only; run `docker -P` to actually expose the port.
-EXPOSE 22 55555
+EXPOSE 22 51234
 
 # This is technically a JSON array, so double quotes are required.
 #ENTRYPOINT ["/opt/maptool/bin/MapTool"]
 
 # Only temporarily, for diagnostics & testing
-#RUN apt update && apt install -y net-tools tcpdump ethtool
+#RUN apt update && apt install -y net-tools tcpdump ethtool nano
 
 CMD ["/usr/sbin/sshd", "-D"]
