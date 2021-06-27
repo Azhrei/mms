@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# Runs the specified image using the proper options to allow access to the
+# networking state inside the container.
+
+# This allows the container to run `ethtool -K eth0 gso off lro off`
+# (I'm not sure this is required.)
+CAPS="--cap-add NET_ADMIN"
+
+# This opens the port for SSHD as well as the passthru for MapTool (when using
+# that option).
+PORTS="-p 2222:22 -p 5555:55555"
+#PORTS="-p 2222:22"
+
+if (( $# < 1 )); then
+    echo >&2 "Missing image name."
+    exit 1
+fi
+
+set -x
+docker run $CAPS $PORTS --name "mms" "$@"

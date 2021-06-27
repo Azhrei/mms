@@ -1,0 +1,33 @@
+#!/bin/bash
+
+terminal=$(tty)
+if (( $? > 0 )); then
+    echo "No pseudoterminal allocated.  Failed."
+    exit 1
+else
+    echo "Connected on $terminal as pid $$"
+fi
+
+LOGFILE=/tmp/mt-serve
+
+exec >"$LOGFILE" 2>&1
+echo "Command line: $0 $*"
+
+source /home/maptool/.ssh/setup.sh
+
+export
+[[ "$REMOTE" == "" || "$REMOTE" == *\ * ]] && exit 1
+echo -e "\nPlayer '$REMOTE' logged in at $(date)"
+
+# I would like to use embedded quotes around the variable substitions,
+# but then I'd have to use eval(1) to run them and that added layer of
+# indirection opens a can of worms,  (I'm not saying there is a problem,
+# but given how the environment is being used, a future change to any
+# of a variety of different programs could introduce such issues.)
+SESSREG="-h ${SSH_CLIENT%% *} -l $terminal $REMOTE"
+trap 'sudo sessreg -d $SESSREG; exit' 0 1 2 3 15
+sudo sessreg -a $SESSREG
+
+# Close stdout and stderr.  Not critical, but it ensures that space used by
+# $LOGFILE can be freed by just removing the file.
+/bin/sleep 3600 1>&- 2>&-
