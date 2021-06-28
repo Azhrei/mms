@@ -27,7 +27,7 @@ Use the following file as the `Dockerfile` for creating the image.
 
 [source,conf]
 ----
-include::Dockerfile[]
+include::context/Dockerfile[]
 ----
 
 // Look into using a remote context.  Essentially, create a repo with
