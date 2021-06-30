@@ -14,14 +14,23 @@ machine or container for the _Massive MapTool Server_ project.
 
 The resulting image (either a virtual machine or container) will require:
 
-. The desired version of _MapTool_ (current is 1.9.2)
 . The SSH daemon (tested with `openssh-server v7.6p1`)
+. The desired version of _MapTool_ (current is `1.9.2`)
+.. Because _MapTool_ doesn't have a _headless_ mode, it will require a full graphical desktop environment (the `Dockerfile` shown below arranges this).
+.. Also required will be either:
+... A remote desktop application, so the GM can connect to the container's desktop and execute _MapTool_, or
+... An X11 server running on the local system, so that _MapTool_ can be executed remotely with the GUI appearing on the local system.
+This option doesn't allow the GM to disconnect as it would kill the _SSH_ tunnel and thus the _MapTool_ server.
 
 Optional components include:
 
-. AsciiDoc (`pandoc 1.19.2.4`; for converting this document into HTML)
+. `pandoc`; for converting this document into HTML
+. `net-tools`; for monitoring network activity
+. `tcpdump`; for packet recording and analysis
+. `ethtool`; for controlling characteristics of network cards
+. `nano`; for editing text files
 
-== Docker Configuration File
+== Building a Docker Container Yourself
 
 Use the following file as the `Dockerfile` for creating the image.
 
@@ -30,6 +39,108 @@ Use the following file as the `Dockerfile` for creating the image.
 include::context/Dockerfile[]
 ----
 
+To choose a different version of _MapTool_, put a different version number in the URL in the `curl` command (or comment out that line and uncomment the one above it that downloads the most recent release).
+
 // Look into using a remote context.  Essentially, create a repo with
 // everything needed, including a Dockerfile, and tell `docker build` to use
 // that repo.  It'll `git clone` the repo and pass it as the build context.
+
+== How to Use the Docker Image
+
+=== Upload the Image to DockerHub.com
+
+You don't have to upload the image to **Docker Hub**, but it simplifies deployment to most cloud services.
+
+=== Create an Instance and Run the Container Image
+
+This varies from one cloud service to the next.
+For example, with AWS:
+
+. Create a Virtual Private Cluster and allocate an instance (the free tier allows `r2.micro`).
+. Put a minimal Linux image into the instance (Amazon has such images already packaged or you can create a custom one).
+. Define a _task_ that holds the result of your `Dockerfile` build as a _container_.
+.. The container has to export two ports: `22` (SSH) and `51234` (client _MapTool_ port).
+.. Also configure the Security Group so that ports `22` and `51234` are allowed through.
+. Start the task.
+. When you view your list of instances, a public IP address will be shown.
+Give the IP address and the client _MapTool_ port number to your players.
+
+=== Connect to the Container
+
+Use _SSH_ to connect to the container and activate X11 forwarding (this allows a shell command to execute _MapTool_ with the GUI coming back to the local system).
+
+. Use `scp` or `sftp` to upload files to the container, if needed (the campaign file is a good example).
+
+. Start an X11 server on the local system.
+.. Linux uses an X11 server as its GUI desktop so there's nothing to do;
+.. macOS includes the **XQuartz** utility, just install and run it;
+.. Windows App Store has **X410** and https://sourceforge.net/projects/vcxsrv/[VcXsrv] is free, just install and run.
+
+. Connect to the container using _SSH_ to get a command prompt.
+
+. Start _MapTool_ and pass it the campaign file on the command line.
+The GUI should open on the local system.
+
+. Start a server in _MapTool_.
+Be sure to turn off **UPNP** and use the port number (`51234`) as allocated in the `Dockerfile`.
+
+=== Configure Public Keys to Allow Player to Connect
+
+Upload a `.csv` file that contains a list of public keys for each valid player.
+
+#This process will eventually become web-based.#
+
+. Execute the `activate.sh` script and pass it the name of the `.csv` file.
+.. It will extract the public keys from the file and write them into the `player-keys` subdirectory, one per player.
+.. It will then combine the public keys together into the `authorized_keys` file.
+
+. Repeat the above steps at any time to regenerate the player keys.
+.. If all you want to do is remove a player key, it may be easier to simply delete the file from `player-keys` and re-execute `activate.sh` _without passing it a filename_.
+.. In this case, it will combine the public keys into the `authorized_keys` file but won't have a `.csv` file to process.
+
+== Future Additions
+
+Terms:
+
+Player:: Someone who connects to the _MapTool_ server using a _MapTool_ client for the purposes of playing in a game session.
+
+GM:: Someone who connects to the _MapTool_ server using a _MapTool_ client for the purpose of _running_ the game session, ie., with GM authority.
+
+Manager:: Someone who manages the lists of Players and GMs.
+(The Manager may also be a GM.)
+
+=== Add a web-based interface for player key updates
+
+This will be done in stages:
+
+. Allow a `.csv` file to be uploaded via a web interface.
+. Create a login process so players do it themselves:
+.. Player creates an account and emails his login id to his Manager.
+.. The Manager adds the player name to his "main list" and that game server now shows up when the player logs in.
+.. The Player can now select the game and generate/upload their own key.
+
+=== Implement a custom URL scheme
+
+The _MapTool_ code will be modified to support putting a URL on the command line.
+
+The URL will be in the following format:
+
+    maptool://{hostname_or_ip:port|registry_alias}/#username=name[?session_password=...]
+
+Players can put that URL on the command line and _MapTool_ will automatically issue the **File -> Connect to Server...** menu option.
+The connection will be immediately be attempted.
+If `session_password` is missing, the dialog will open with the information filled in, but the `Password` field empty.
+
+Future expansion of this concept will allow any fields that appear in the **File -> Start Server...** dialog to be specified as URL _get parameters_:
+
+    maptool://hostname_or_ip:port/#username=name?gm_password=...&player_password=...[&use_upnp=true&rptools_net_alias=...&strict_token_ownership=true&...
+
+In this format:
+
+. _MapTool_ will bind to the address given (recommended is `0.0.0.0`, which is the same as `IPADDR_ANY`).
+. The `:port` will be the port that the server listens on.
+. The `gm_password` and `player_password` fields _must_ be provided, as they are used to distinguish the role of all clients who connect.
+. All other options on the dialog are converted to _normalized strings_ and become parameters.
+(Normalized strings have all occurences of `[\s\P{punct}]+` replaced with a single underscore, and all text converted to lowercase.)
+. Values for checkboxes may be `true`, `on`, `yes`, or `1` to mean the checkbox is checked, and `false`, `off`, `no`, or `0` to mean that it is not.
+. The `movement_metric` value should be the values in the dropdown list as normalized strings.
