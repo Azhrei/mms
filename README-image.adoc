@@ -144,3 +144,6 @@ In this format:
 (Normalized strings have all occurences of `[\s\P{punct}]+` replaced with a single underscore, and all text converted to lowercase.)
 . Values for checkboxes may be `true`, `on`, `yes`, or `1` to mean the checkbox is checked, and `false`, `off`, `no`, or `0` to mean that it is not.
 . The `movement_metric` value should be the values in the dropdown list as normalized strings.
+
+At some point, it would be ideal if each of the platforms we support could be taught that the `maptool://` URL is tied to our application.
+That would allow the user to receive such a URL in an email or see it on a web page, and just click it to invoke _MapTool_ and connect.
