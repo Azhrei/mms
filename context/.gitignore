@@ -1,3 +1,3 @@
-# Don't save any of the keys used for testing, but if the directory
-# contains README files or scripts or misc stuff, _do_ keep those.
-player-keys/*.pub
+# Intermediate files are not needed
+activate.log
+authorized_keys

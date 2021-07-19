@@ -4,9 +4,8 @@ terminal=$(tty)
 if (( $? > 0 )); then
     echo "No pseudoterminal allocated.  Failed."
     exit 1
-else
-    echo "Connected on $terminal as pid $$"
 fi
+echo "Connected on $terminal as pid $$"
 
 LOGFILE=/tmp/mt-serve
 
@@ -14,20 +13,23 @@ exec >"$LOGFILE" 2>&1
 echo "Command line: $0 $*"
 
 source /home/maptool/.ssh/setup.sh
-
 export
-[[ "$REMOTE" == "" || "$REMOTE" == *\ * ]] && exit 1
+
+# If the REMOTE variable is empty, or if it contains any of the characters in
+# $IFS, then there's a configuration error -- terminate.
+[[ "$REMOTE" == "" || "$REMOTE" == *[$IFS]* ]] && exit 1
 echo -e "\nPlayer '$REMOTE' logged in at $(date)"
 
-# I would like to use embedded quotes around the variable substitions,
-# but then I'd have to use eval(1) to run them and that added layer of
-# indirection opens a can of worms,  (I'm not saying there is a problem,
-# but given how the environment is being used, a future change to any
-# of a variety of different programs could introduce such issues.)
-SESSREG="-h ${SSH_CLIENT%% *} -l $terminal $REMOTE"
-trap 'sudo sessreg -d $SESSREG; exit' 0 1 2 3 15
-sudo sessreg -a $SESSREG
+# Using an array here means I can use "[@]" later on, which means I can quote
+# individual words in this assignment and it'll carry through to its usage.
+SESSREG=("-h" "${SSH_CLIENT%% *}" "-l" "$terminal" "$REMOTE")
+trap 'sudo sessreg -d "${SESSREG[@]}"; exit' 0 1 2 3 15
+sudo sessreg -a "${SESSREG[@]}"
 
 # Close stdout and stderr.  Not critical, but it ensures that space used by
 # $LOGFILE can be freed by just removing the file.
-/bin/sleep 3600 1>&- 2>&-
+exec 1>&- 2>&-
+
+# Currently set for 24 hours.  Could change this to a variable or read from a
+# database to allow a per-user timeout value.
+/bin/sleep 86400
