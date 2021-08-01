@@ -65,16 +65,16 @@ def status(*args):
     # use module `logging`?
     try:
         exit_status = int(args[0])
-        print(args[1:], file=logfile)
+        print(*args[1:], file=logfile)
         if environment['isatty']:
-            print(args[1:], file=sys.stdout)
+            print(*args[1:], file=sys.stdout)
         print("", file=logfile)
         print("You may close this window now.", file=logfile)
         sys.exit(exit_status)
     except ValueError:
-        print(args, file=logfile)
+        print(*args, file=logfile)
         if environment['isatty']:
-            print(args, file=sys.stdout)
+            print(*args, file=sys.stdout)
 
 
 def isValidKey(k):
@@ -96,7 +96,7 @@ def write_one_key(options, key):
 
 
 status(f"Logging to '{LOGFILE}' started at {time.asctime()}")
-status(" ")
+status("")
 
 with tempfile.NamedTemporaryFile(mode="wt", delete=False, dir=setup.BASE_DIR) as tmpfile:
     # Immediately protect the contents of the temporary file
@@ -120,7 +120,9 @@ with tempfile.NamedTemporaryFile(mode="wt", delete=False, dir=setup.BASE_DIR) as
     # Okay, now we can process any admin keys.
     port_forwarding = 'port-forwarding'
     counter = 1
-    for file in os.listdir(setup.ADMIN_KEYS):
+    # The filelist should be alphabetized so that the 'admin#' numbers
+    # are predictable from one run to the next.
+    for file in sorted(os.listdir(setup.ADMIN_KEYS)):
         # This allows files stored by having Firefox download them from a
         # GDrive location, as well as .pub files uploaded from a Un*x box.
         if file.endswith(".txt") or file.endswith(".pub"):
@@ -134,6 +136,9 @@ with tempfile.NamedTemporaryFile(mode="wt", delete=False, dir=setup.BASE_DIR) as
                         continue
                     environ = f'environment="REMOTE=admin{counter}"'
                     counter += 1
+                    # This is all text up to the first newline, and the whole
+                    # string if there isn't one.
+                    line = line.split('\n')[0]
                     write_one_key(",".join([port_forwarding, environ]), line)
                     status(f"admin:{key_file}:{lnum}:wrote one key")
 
@@ -143,14 +148,14 @@ with tempfile.NamedTemporaryFile(mode="wt", delete=False, dir=setup.BASE_DIR) as
         for lnum, row in enumerate(csv.reader(k), 1):
             # Some basic sanity checks first
             if len(row) != 4:
-                status(f"player:{key_file}:{lnum}:number of fields != 3")
+                status(f"player:{csv_file}:{lnum}:number of fields != 3")
                 continue
             if not isValidKey(row[1]):
-                status(f"player:{key_file}:{lnum}:unrecognized key format")
+                status(f"player:{csv_file}:{lnum}:unrecognized key format")
                 continue
             environ = f'environment="REMOTE={row[2].replace("#", "_")}"'
             write_one_key(",".join([command, port_forwarding, environ]), row[1])
-            status(f"player:{key_file}:{lnum}:wrote one key")
+            status(f"player:{csv_file}:{lnum}:wrote one key")
 
 try:
     os.replace(setup.BASE_DIR + "/authorized_keys", setup.BASE_DIR + "/authorized_keys.old")

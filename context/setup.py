@@ -50,7 +50,7 @@ ADMIN_KEYS = BASE_DIR + "/admin-keys"
 
 # Sanitize the environment first.
 # (Not yet.  We'll do this when development is done.)
-#os.putenv("PATH", "/bin:/usr/bin:/sbin:/usr/sbin")
+# os.putenv("PATH", "/bin:/usr/bin:/sbin:/usr/sbin")
 os.putenv("PATH", BASE_DIR + "/scripts" + os.pathsep + os.getenv("PATH"))
 
 # Keys are kept in CSV files in this directory.  The 'activate' script will
@@ -63,8 +63,9 @@ PUB_KEYS = HOME + "/Downloads"
 def ssh_key_types():
     types = []
     try:
-        completed = subprocess.run(['ssh', '-Q', 'key'], text=True, check=True, capture_output=True)
+        completed = subprocess.run(['ssh', '-Q', 'key'], encoding='utf-8',
+                                   check=True, stdout=subprocess.PIPE)
         types = completed.stdout.split('\n')
-    except subprocess.CalledProcessError as ex:
-        print(f"During subprocess.run(): {ex}")
+    except subprocess.CalledProcessError as exc:
+        print(f"During subprocess.run(): {exc}")
     return types
