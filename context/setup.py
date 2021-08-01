@@ -20,6 +20,7 @@ BASE_DIR/scripts.
 """
 
 import os
+import subprocess
 import sys
 
 HOME = os.getenv("HOME", "/home/maptool")
@@ -40,7 +41,7 @@ if sys.platform == "darwin":
 try:
     os.chdir(MAPTOOL_SSH)
 except Exception as ex:
-    print(f"During chdir('{_maptool_ssh}'): {ex}", file=sys.stderr)
+    print(f"During chdir('{MAPTOOL_SSH}'): {ex}", file=sys.stderr)
     sys.exit(99)
 
 BASE_DIR = os.getcwd()
@@ -62,10 +63,7 @@ PUB_KEYS = HOME + "/Downloads"
 def ssh_key_types():
     types = []
     try:
-        completed = subprocess.run(['ssh', '-Q', 'key'],
-                        text=True,
-                        check=True
-                        capture_output=True)
+        completed = subprocess.run(['ssh', '-Q', 'key'], text=True, check=True, capture_output=True)
         types = completed.stdout.split('\n')
     except subprocess.CalledProcessError as ex:
         print(f"During subprocess.run(): {ex}")

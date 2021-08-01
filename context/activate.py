@@ -18,6 +18,10 @@
 # can be specified.)
 
 import csv
+import os
+import subprocess
+import sys
+import tempfile
 import time
 
 # Sets relevant environment variables and changes directory
@@ -60,14 +64,14 @@ def status(*args):
     # Should I add a time stamp to the logfile records?  Should I switch to
     # use module `logging`?
     try:
-        exit = int(args[0])
+        exit_status = int(args[0])
         print(args[1:], file=logfile)
         if environment['isatty']:
             print(args[1:], file=sys.stdout)
         print("", file=logfile)
         print("You may close this window now.", file=logfile)
-        sys.exit(exit)
-    except:
+        sys.exit(exit_status)
+    except ValueError:
         print(args, file=logfile)
         if environment['isatty']:
             print(args, file=sys.stdout)
@@ -82,7 +86,7 @@ def isValidKey(k):
     fields = k.split()
     if len(fields) != 3 or len(fields[1]) < 64:
         return False
-    if fields not in key_types:
+    if fields[0] not in key_types:
         return False
     return True
 
@@ -96,7 +100,7 @@ status(" ")
 
 with tempfile.NamedTemporaryFile(mode="wt", delete=False, dir=setup.BASE_DIR) as tmpfile:
     # Immediately protect the contents of the temporary file
-    os.chmod(tmpfile.name, 0600)
+    os.chmod(tmpfile.name, 0o600)
 
     # First, ensure there is even a keys file available.
     csv_file = None
@@ -128,9 +132,9 @@ with tempfile.NamedTemporaryFile(mode="wt", delete=False, dir=setup.BASE_DIR) as
                     if not isValidKey(line):
                         status(f"admin:{key_file}:{lnum}:unrecognized key format")
                         continue
-                    environment = f'environment="REMOTE=admin{counter}"'
+                    environ = f'environment="REMOTE=admin{counter}"'
                     counter += 1
-                    write_one_key(",".join(port_forwarding,environment), line)
+                    write_one_key(",".join([port_forwarding, environ]), line)
                     status(f"admin:{key_file}:{lnum}:wrote one key")
 
     # Do all player/GM keys that have been uploaded.
@@ -144,8 +148,8 @@ with tempfile.NamedTemporaryFile(mode="wt", delete=False, dir=setup.BASE_DIR) as
             if not isValidKey(row[1]):
                 status(f"player:{key_file}:{lnum}:unrecognized key format")
                 continue
-            environment = f'environment="REMOTE={row[2].replace("#", "_")}"'
-            write_one_key(",".join(command,port_forwarding,environment), row[1])
+            environ = f'environment="REMOTE={row[2].replace("#", "_")}"'
+            write_one_key(",".join([command, port_forwarding, environ]), row[1])
             status(f"player:{key_file}:{lnum}:wrote one key")
 
 try:
