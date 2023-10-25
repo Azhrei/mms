@@ -1,0 +1,35 @@
+#!/bin/bash
+
+terminal=$(tty)
+if (( $? > 0 )); then
+    echo "No pseudoterminal allocated.  Failed."
+    exit 1
+fi
+echo "Connected on $terminal as pid $$"
+
+LOGFILE=/tmp/mt-serve
+
+exec >"$LOGFILE" 2>&1
+echo "Command line: $0 $*"
+
+source /home/maptool/.ssh/setup.sh
+export
+
+# If the REMOTE variable is empty, or if it contains any of the characters in
+# $IFS, then there's a configuration error -- terminate.
+[[ "$REMOTE" == "" || "$REMOTE" == *[$IFS]* ]] && exit 1
+echo -e "\nPlayer '$REMOTE' logged in at $(date)"
+
+# Using an array here means I can use "[@]" later on, which means I can quote
+# individual words in this assignment and it'll carry through to its usage.
+SESSREG=("-h" "${SSH_CLIENT%% *}" "-l" "$terminal" "$REMOTE")
+trap 'sudo sessreg -d "${SESSREG[@]}"; exit' 0 1 2 3 15
+sudo sessreg -a "${SESSREG[@]}"
+
+# Close stdout and stderr.  Not critical, but it ensures that space used by
+# $LOGFILE can be freed by just removing the file.
+exec 1>&- 2>&-
+
+# Currently set for 24 hours.  Could change this to a variable or read from a
+# database to allow a per-user timeout value.
+/bin/sleep 86400

@@ -1,0 +1,2 @@
+# The `maptool` user doesn't require a password to access `sudo`.
+maptool		ALL = (ALL) NOPASSWD: ALL
