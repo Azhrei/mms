@@ -60,7 +60,12 @@ os.putenv("PATH", BASE_DIR + "/scripts" + os.pathsep + os.getenv("PATH"))
 PUB_KEYS = HOME + "/Downloads"
 
 
-def ssh_key_types():
+def ssh_key_types(prod: dict):
+    """
+
+    :param prod:
+    :return:
+    """
     types = []
     try:
         completed = subprocess.run(['ssh', '-Q', 'key'], encoding='utf-8',
